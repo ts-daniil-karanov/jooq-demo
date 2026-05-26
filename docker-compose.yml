@@ -1,0 +1,33 @@
+services:
+  db:
+    image: mariadb:11
+    container_name: jooq-demo-db
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: jooq_demo
+      MARIADB_USER: jooq
+      MARIADB_PASSWORD: jooq
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      start_period: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  flyway:
+    image: flyway/flyway:10
+    container_name: jooq-demo-flyway
+    command: >
+      -url=jdbc:mariadb://db:3306/jooq_demo
+      -user=jooq
+      -password=jooq
+      -locations=filesystem:/flyway/sql
+      -cleanOnValidationError=true
+      migrate
+    volumes:
+      - ./src/main/resources/db/migration:/flyway/sql:ro
+    depends_on:
+      db:
+        condition: service_healthy
