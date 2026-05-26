@@ -7,10 +7,12 @@ package com.example.jooqdemo.generated;
 import com.example.jooqdemo.generated.tables.Author;
 import com.example.jooqdemo.generated.tables.Book;
 import com.example.jooqdemo.generated.tables.Review;
+import com.example.jooqdemo.generated.tables.Test;
 import com.example.jooqdemo.generated.tables.UserBalance;
 import com.example.jooqdemo.generated.tables.records.AuthorRecord;
 import com.example.jooqdemo.generated.tables.records.BookRecord;
 import com.example.jooqdemo.generated.tables.records.ReviewRecord;
+import com.example.jooqdemo.generated.tables.records.TestRecord;
 import com.example.jooqdemo.generated.tables.records.UserBalanceRecord;
 
 import org.jooq.ForeignKey;
@@ -35,6 +37,7 @@ public class Keys {
     public static final UniqueKey<AuthorRecord> KEY_AUTHOR_UQ_AUTHOR_NAME = Internal.createUniqueKey(Author.AUTHOR, DSL.name("KEY_author_uq_author_name"), new TableField[] { Author.AUTHOR.NAME }, true);
     public static final UniqueKey<BookRecord> KEY_BOOK_PRIMARY = Internal.createUniqueKey(Book.BOOK, DSL.name("KEY_book_PRIMARY"), new TableField[] { Book.BOOK.ID }, true);
     public static final UniqueKey<ReviewRecord> KEY_REVIEW_PRIMARY = Internal.createUniqueKey(Review.REVIEW, DSL.name("KEY_review_PRIMARY"), new TableField[] { Review.REVIEW.ID }, true);
+    public static final UniqueKey<TestRecord> KEY_TEST_PRIMARY = Internal.createUniqueKey(Test.TEST, DSL.name("KEY_test_PRIMARY"), new TableField[] { Test.TEST.ID }, true);
     public static final UniqueKey<UserBalanceRecord> KEY_USER_BALANCE_PRIMARY = Internal.createUniqueKey(UserBalance.USER_BALANCE, DSL.name("KEY_user_balance_PRIMARY"), new TableField[] { UserBalance.USER_BALANCE.USER_ID }, true);
 
     // -------------------------------------------------------------------------

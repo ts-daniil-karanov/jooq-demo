@@ -1,6 +1,7 @@
 import org.jooq.meta.jaxb.Logging
 
 import java.io.File
+import java.net.URLClassLoader
 
 plugins {
     id("java")
@@ -33,6 +34,12 @@ val codegenDbUrl  = System.getenv("CODEGEN_DB_URL")      ?: "jdbc:mariadb://loca
 val codegenDbUser = System.getenv("CODEGEN_DB_USER")     ?: "jooq"
 val codegenDbPass = System.getenv("CODEGEN_DB_PASSWORD") ?: "jooq"
 
+// ── Flyway classpath (isolated — the Flyway Gradle plugin is incompatible with Gradle 9) ────
+// Resolved at task-execution time via URLClassLoader; never leaks into the main compile classpath.
+val codegenFlyway: Configuration by configurations.creating {
+    isTransitive = true
+}
+
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-jooq")
     implementation("org.mariadb.jdbc:mariadb-java-client")
@@ -44,6 +51,11 @@ dependencies {
     // MariaDB driver on the jOOQ generator classpath (needed to connect at generateJooq time)
     jooqGenerator("org.mariadb.jdbc:mariadb-java-client")
 
+    // Flyway JARs for the standalone flywayMigrate task (versions come from the Spring Boot BOM)
+    codegenFlyway("org.flywaydb:flyway-core")
+    codegenFlyway("org.flywaydb:flyway-mysql")
+    codegenFlyway("org.mariadb.jdbc:mariadb-java-client")
+
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.testcontainers:mariadb")
@@ -51,6 +63,66 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testCompileOnly("org.projectlombok:lombok")
     testAnnotationProcessor("org.projectlombok:lombok")
+}
+
+// ── Flyway migration task ─────────────────────────────────────────────────────
+// The official Flyway Gradle plugin (org.flywaydb.flyway) references the removed
+// JavaPluginConvention API and throws on Gradle 9.  Instead we resolve the Flyway
+// JARs into the isolated `codegenFlyway` configuration and invoke Flyway
+// programmatically through URLClassLoader + reflection so nothing leaks into the
+// main compile or runtime classpaths.
+tasks.register("flywayMigrate") {
+    group = "database"
+    description = "Runs Flyway migrations against the local MariaDB instance (alternative to docker compose up -d)"
+
+    val migrationsDir = layout.projectDirectory.dir("src/main/resources/db/migration").asFile
+    inputs.dir(migrationsDir)
+    // Re-run whenever the resolved JARs change (e.g. after a Flyway version bump)
+    inputs.files(codegenFlyway)
+
+    doLast {
+        val urls = codegenFlyway.resolve().map { it.toURI().toURL() }.toTypedArray()
+        // Platform classloader as parent — gives Flyway access to java.sql.* without
+        // leaking any Gradle or project classes into the isolated loader.
+        val loader = URLClassLoader(urls, ClassLoader.getPlatformClassLoader())
+        // Flyway 10 discovers database plugins via ServiceLoader, which defaults to the
+        // thread context classloader.  Swap it in so ServiceLoader finds flyway-mysql.
+        val originalCtxCl = Thread.currentThread().contextClassLoader
+        Thread.currentThread().contextClassLoader = loader
+        try {
+            val flywayClass = loader.loadClass("org.flywaydb.core.Flyway")
+
+            // Flyway.configure() → FluentConfiguration (static factory)
+            var cfg: Any = flywayClass.getMethod("configure").invoke(null)!!
+
+            // Fluent chain — each method returns `this` (FluentConfiguration).
+            // Cast to Any before .javaClass so Kotlin resolves the non-nullable extension.
+            cfg = (cfg as Any).javaClass
+                .getMethod("dataSource", String::class.java, String::class.java, String::class.java)
+                .invoke(cfg, codegenDbUrl, codegenDbUser, codegenDbPass)!!
+
+            // locations(String...) is a vararg; cast to Any so Kotlin doesn't spread the array
+            cfg = (cfg as Any).javaClass
+                .getMethod("locations", Array<String>::class.java)
+                .invoke(cfg, arrayOf("filesystem:${migrationsDir.absolutePath}") as Any)!!
+
+            cfg = (cfg as Any).javaClass
+                .getMethod("cleanOnValidationError", Boolean::class.javaPrimitiveType)
+                .invoke(cfg, true)!!
+
+            // FluentConfiguration.load() → Flyway instance
+            val flyway: Any = (cfg as Any).javaClass.getMethod("load").invoke(cfg)!!
+
+            // Flyway.migrate() → MigrateResult
+            val result: Any = (flyway as Any).javaClass.getMethod("migrate").invoke(flyway)!!
+            // MigrateResult.migrationsExecuted is a public field in Flyway 10, not a getter
+            val count = (result as Any).javaClass.getField("migrationsExecuted").get(result) as Int
+            logger.lifecycle("Flyway: $count migration(s) applied.")
+        } finally {
+            Thread.currentThread().contextClassLoader = originalCtxCl
+            loader.close()
+        }
+    }
 }
 
 // ── jOOQ code generation from the real MariaDB schema ────────────────────────
@@ -110,6 +182,11 @@ sourceSets {
             srcDir("src/main/generated")
         }
     }
+}
+
+// generateJooq must see the current schema → run migrations first
+tasks.named("generateJooq") {
+    dependsOn("flywayMigrate")
 }
 
 tasks.named<Test>("test") {

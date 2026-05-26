@@ -7,6 +7,7 @@ package com.example.jooqdemo.generated;
 import com.example.jooqdemo.generated.tables.Author;
 import com.example.jooqdemo.generated.tables.Book;
 import com.example.jooqdemo.generated.tables.Review;
+import com.example.jooqdemo.generated.tables.Test;
 import com.example.jooqdemo.generated.tables.UserBalance;
 
 
@@ -30,6 +31,11 @@ public class Tables {
      * The table <code>jooq_demo.review</code>.
      */
     public static final Review REVIEW = Review.REVIEW;
+
+    /**
+     * The table <code>jooq_demo.test</code>.
+     */
+    public static final Test TEST = Test.TEST;
 
     /**
      * The table <code>jooq_demo.user_balance</code>.

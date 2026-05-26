@@ -7,6 +7,7 @@ package com.example.jooqdemo.generated;
 import com.example.jooqdemo.generated.tables.Author;
 import com.example.jooqdemo.generated.tables.Book;
 import com.example.jooqdemo.generated.tables.Review;
+import com.example.jooqdemo.generated.tables.Test;
 import com.example.jooqdemo.generated.tables.UserBalance;
 
 import java.util.Arrays;
@@ -46,6 +47,11 @@ public class JooqDemo extends SchemaImpl {
     public final Review REVIEW = Review.REVIEW;
 
     /**
+     * The table <code>jooq_demo.test</code>.
+     */
+    public final Test TEST = Test.TEST;
+
+    /**
      * The table <code>jooq_demo.user_balance</code>.
      */
     public final UserBalance USER_BALANCE = UserBalance.USER_BALANCE;
@@ -69,6 +75,7 @@ public class JooqDemo extends SchemaImpl {
             Author.AUTHOR,
             Book.BOOK,
             Review.REVIEW,
+            Test.TEST,
             UserBalance.USER_BALANCE
         );
     }
